@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>外场培训 · 离线包管理</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header>
+    <h1>外场培训媒体离线包</h1>
+    <div class="status-bar">
+      <span id="net-status" class="badge">检测中…</span>
+      <span id="storage-usage" class="badge">存储：—</span>
+      <span id="play-net-count" class="badge">播放期网络请求：0</span>
+    </div>
+  </header>
+
+  <main>
+    <section id="courses-panel">
+      <h2>课程目录</h2>
+      <div id="catalog-note"></div>
+      <div id="course-list"></div>
+    </section>
+
+    <section id="player-panel">
+      <h2>离线播放</h2>
+      <div id="player-empty">选择一门「可用」的课程开始播放。播放内容全部来自本地缓存，不经过网络。</div>
+      <div id="player-active" hidden>
+        <video id="video" controls crossorigin="anonymous"></video>
+        <div id="player-meta"></div>
+        <div id="subtitle-switch"></div>
+        <button id="btn-close-player">关闭播放器</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // Injected by the deployment; tests override via addInitScript if needed.
+    window.OFFLINE_ORIGIN = window.OFFLINE_ORIGIN ?? 'http://localhost:4101';
+  </script>
+  <script type="module" src="ui.js"></script>
+</body>
+</html>

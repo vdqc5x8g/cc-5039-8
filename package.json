@@ -1,0 +1,28 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test 'tests/unit/*.test.mjs'",
+    "build:media": "node tools/build-media.js",
+    "dev": "node server/dev.js",
+    "test:e2e": "LD_LIBRARY_PATH=/workspace/.syslibs/root/usr/lib/aarch64-linux-gnu:/workspace/.syslibs/root/lib/aarch64-linux-gnu playwright test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cinderrapid8/cc-5039-8.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/cinderrapid8/cc-5039-8/issues"
+  },
+  "homepage": "https://github.com/cinderrapid8/cc-5039-8#readme",
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.65.1",
+    "ffmpeg-static": "^5.3.0"
+  }
+}

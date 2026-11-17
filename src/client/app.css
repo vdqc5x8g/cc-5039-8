@@ -1,0 +1,81 @@
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  background: #f4f5f7;
+  color: #1c2333;
+}
+header {
+  background: #17324f;
+  color: #fff;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+header h1 { font-size: 18px; margin: 0; flex: 1; }
+.status-bar { display: flex; gap: 8px; }
+.badge {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.badge.online { background: #1d7a3d; }
+.badge.offline { background: #b3382c; }
+main {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(420px, 1fr);
+  gap: 16px;
+  padding: 16px 20px;
+}
+@media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+section {
+  background: #fff;
+  border: 1px solid #dde1e7;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+h2 { font-size: 15px; margin: 0 0 10px; color: #445; }
+.course-card {
+  border: 1px solid #dde1e7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+}
+.course-head { display: flex; align-items: center; gap: 10px; }
+.course-title { font-weight: 600; flex: 1; }
+.course-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; background: #e8eaee; }
+.course-status.ready { background: #d5f0dc; color: #14652e; }
+.course-status.installing { background: #fff1c2; color: #7a5b00; }
+.course-status.failed { background: #fbd9d3; color: #9c2717; }
+.course-error { color: #9c2717; font-size: 12px; margin-top: 6px; word-break: break-all; }
+.combo-row { display: flex; gap: 10px; align-items: center; margin: 8px 0; flex-wrap: wrap; font-size: 13px; }
+.combo-row select { padding: 3px 6px; }
+.subs-checks { display: inline-flex; gap: 8px; }
+.actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+button {
+  border: 1px solid #17324f;
+  background: #17324f;
+  color: #fff;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+button.secondary { background: #fff; color: #17324f; }
+button.danger { background: #fff; color: #9c2717; border-color: #9c2717; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+progress { width: 100%; height: 10px; margin-top: 8px; }
+.progress-text { font-size: 12px; color: #556; margin-top: 4px; }
+.playable-info { font-size: 12px; color: #334; margin-top: 8px; line-height: 1.7; }
+.playable-info .missing { color: #9c2717; }
+#video { width: 100%; background: #000; border-radius: 6px; }
+#player-meta { font-size: 12px; color: #445; margin: 8px 0; line-height: 1.7; }
+#subtitle-switch { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+#subtitle-switch button { font-size: 12px; padding: 3px 10px; }
+#catalog-note { font-size: 12px; color: #9c2717; margin-bottom: 8px; }
+.verify-report { font-size: 12px; margin-top: 6px; }
+.verify-report.ok { color: #14652e; }
+.verify-report.bad { color: #9c2717; }
