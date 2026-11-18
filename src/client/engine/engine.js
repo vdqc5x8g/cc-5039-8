@@ -7,8 +7,51 @@ import { MediaStore } from './store.js';
 import { computeClosure, courseKey, playableFromPresence } from './closure.js';
 import { planEviction, QuotaError } from './eviction.js';
 import { sha256Hex } from './hash.js';
+import { assertSupportedManifestVersion, PACKAGE_DESCRIPTOR_FILE } from '../shared/package-format.js';
+import { evaluatePackage } from '../shared/package-contract.js';
 
 const CONCURRENCY = 3;
+
+/**
+ * Index an imported package directory by package-relative path. A directory
+ * picker prefixes every entry with the chosen folder's name; strip exactly
+ * that shared prefix so `pkg/objects/x` becomes `objects/x`.
+ */
+function indexImportFiles(files) {
+  const entries = [...files].map((file) => ({
+    file,
+    rel: String(file.webkitRelativePath || file.name).replace(/\\/g, '/'),
+  }));
+  const prefixed = entries.every((e) => e.rel.includes('/'));
+  const strip = prefixed ? entries[0].rel.split('/')[0] : null;
+  const byPath = new Map();
+  for (const { file, rel } of entries) {
+    const clean = strip && rel.startsWith(`${strip}/`) ? rel.slice(strip.length + 1) : rel;
+    byPath.set(clean, file);
+  }
+  return byPath;
+}
+
+/**
+ * The contract view of a directory picker selection, shared by the UI's
+ * pre-flight check and importPackage. Keeps one indexing implementation so a
+ * pre-check can never disagree with the import that follows it.
+ */
+export async function inspectPackageFiles(files) {
+  const byPath = indexImportFiles(files);
+  const readObject = async (rel) => {
+    const file = byPath.get(rel);
+    return file ? new Uint8Array(await file.arrayBuffer()) : null;
+  };
+  const report = await evaluatePackage({
+    descriptorBytes: await readObject(PACKAGE_DESCRIPTOR_FILE),
+    readObject,
+    sha256: sha256Hex,
+    objectFiles: [...byPath.keys()].filter((p) => p.startsWith('objects/')),
+    topLevelEntries: [...byPath.keys()].filter((p) => !p.includes('/')),
+  });
+  return { byPath, report };
+}
 
 export class OfflineEngine {
   static async open({ dbName, originBase, estimateStorage } = {}) {
@@ -46,7 +89,113 @@ export class OfflineEngine {
   async fetchManifest(manifestUrl) {
     const res = await fetch(`${this.originBase}/${manifestUrl}`, { cache: 'no-store' });
     if (!res.ok) throw new Error(`课程清单获取失败：HTTP ${res.status} (${manifestUrl})`);
-    return res.json();
+    const manifest = await res.json();
+    // The loader accepts exactly the manifest versions the format contract
+    // declares. A manifest without `version` is rejected, never assumed.
+    return assertSupportedManifestVersion(manifest);
+  }
+
+  // ---- sealed offline package import (no network at all) ----
+
+  /**
+   * Import a sealed package directory (descriptor + manifest + objects/).
+   * Every object is verified and committed to the cache; the course record's
+   * manifest URLs point at cache paths, so later playback has no source to
+   * fall back to.
+   *
+   * @param {FileList|File[]} files  files chosen from the package directory
+   */
+  async importPackage(files, { onProgress } = {}) {
+    if (!files || files.length === 0) {
+      throw new Error('未选择任何文件（请选择包含 package.json 的包目录）');
+    }
+    const { byPath, report } = await inspectPackageFiles(files);
+    const readObject = async (rel) => {
+      const file = byPath.get(rel);
+      return file ? new Uint8Array(await file.arrayBuffer()) : null;
+    };
+    if (!report.ok) {
+      const first = report.errors[0];
+      const err = new Error(`离线包校验失败（${first.code}）：${first.message}`);
+      err.code = first.code;
+      err.errors = report.errors;
+      throw err;
+    }
+
+    const { descriptor, manifest, closure } = report;
+    const key = courseKey(manifest.courseId, descriptor.selection);
+    const existing = await this.store.getCourse(key);
+    if (existing?.status === 'ready' && (await this.verify(key)).ok) {
+      return { key, already: true };
+    }
+
+    // Cache path is declared per digest, so import reads exactly the file the
+    // descriptor claims — not a path re-derived from the manifest.
+    const pathByHash = new Map(descriptor.objects.map((o) => [o.sha256, o.path]));
+    const record = {
+      key,
+      courseId: manifest.courseId,
+      title: manifest.title ?? manifest.courseId,
+      manifestVersion: manifest.version,
+      packageFormatVersion: descriptor.formatVersion,
+      source: 'package',
+      selection: descriptor.selection,
+      closure,
+      status: 'installing',
+      error: null,
+      bytesTotal: closure.totalBytes,
+      bytesDone: 0,
+      createdAt: existing?.createdAt ?? Date.now(),
+      updatedAt: Date.now(),
+      completedAt: null,
+    };
+    await this._syncPresence(record);
+    await this.store.putCourse(record);
+    this._emit();
+
+    const total = closure.objects.length;
+    let done = 0;
+    try {
+      for (const obj of closure.objects) {
+        if (obj.done) { done += 1; continue; }
+        const path = pathByHash.get(obj.hash);
+        const bytes = path ? await readObject(path) : null;
+        if (!bytes) throw new Error(`离线包缺少对象：${path ?? obj.hash}`);
+        if (bytes.byteLength !== obj.size) {
+          throw new Error(`大小不符，${obj.label}：期望 ${obj.size} 字节，实际 ${bytes.byteLength} 字节`);
+        }
+        if ((await sha256Hex(bytes)) !== obj.hash) {
+          throw new Error(`内容校验失败，${obj.label}`);
+        }
+        await this.store.putObjectAndMark(key, { ...obj, bytes });
+        obj.done = true;
+        done += 1;
+        onProgress?.({
+          key, phase: 'object', label: obj.label,
+          objectsDone: done, objectsTotal: total,
+          bytesDone: record.bytesDone, bytesTotal: record.bytesTotal,
+        });
+      }
+      const absent = [];
+      for (const o of closure.objects) {
+        if (!(await this.store.hasObject(o.hash))) absent.push(o);
+      }
+      if (absent.length > 0) {
+        throw new Error(`离线包依赖未闭合，缺少 ${absent.length} 个对象：${absent[0].label} 等`);
+      }
+      await this.store.commitCourse(key);
+      record.status = 'ready';
+      record.packageImportedAt = Date.now();
+      await this.store.putCourse(record);
+      this._emit();
+      return { key, already: false };
+    } catch (err) {
+      record.status = 'failed';
+      record.error = err.message;
+      await this.store.putCourse(record);
+      this._emit();
+      throw err;
+    }
   }
 
   // ---- install / resume ----

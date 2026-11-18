@@ -26,6 +26,7 @@ __pycache__/
 
 # generated media library + local syslibs + test output
 origin-data/
+packages/
 .syslibs/
 test-results/
 playwright-report/

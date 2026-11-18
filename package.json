@@ -6,6 +6,10 @@
   "scripts": {
     "test": "node --test 'tests/unit/*.test.mjs'",
     "build:media": "node tools/build-media.js",
+    "packages:build": "node tools/build-samples.js",
+    "check:packages": "node tools/check-package.js --all",
+    "check:format": "node tools/check-format-doc.js",
+    "test:format": "npm run packages:build && npm run check:packages && npm run check:format",
     "dev": "node server/dev.js",
     "test:e2e": "LD_LIBRARY_PATH=/workspace/.syslibs/root/usr/lib/aarch64-linux-gnu:/workspace/.syslibs/root/lib/aarch64-linux-gnu playwright test"
   },

@@ -96,7 +96,11 @@ function vtt(course, lang) {
 }
 
 console.log('building media library →', path.relative(ROOT, OUT));
+// A rebuild replaces the origin library and every derived package built from
+// it, so stale packages can never masquerade as current. Generated media is
+// disposable; anything hand-authored belongs elsewhere.
 fs.rmSync(OUT, { recursive: true, force: true });
+fs.rmSync(path.join(ROOT, 'packages'), { recursive: true, force: true });
 ensureDir(OUT);
 
 // 1. Shared intro segments (identical bytes for every course → shared cache objects).

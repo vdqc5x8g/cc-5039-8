@@ -23,12 +23,27 @@
       <div id="course-list"></div>
     </section>
 
+    <section id="package-panel">
+      <h2>离线包</h2>
+      <p class="hint">选择本机的离线包目录（包含 <code>package.json</code>）。校验、导入与播放都不经过网络。</p>
+      <div class="actions">
+        <label class="btn-file">
+          选择离线包目录
+          <input id="package-input" type="file" multiple webkitdirectory directory hidden>
+        </label>
+        <button id="btn-check-package" class="secondary" disabled>检查所选包</button>
+      </div>
+      <div id="package-status" class="package-status" role="status"></div>
+      <div id="package-report" class="package-report"></div>
+    </section>
+
     <section id="player-panel">
       <h2>离线播放</h2>
       <div id="player-empty">选择一门「可用」的课程开始播放。播放内容全部来自本地缓存，不经过网络。</div>
       <div id="player-active" hidden>
         <video id="video" controls crossorigin="anonymous"></video>
         <div id="player-meta"></div>
+        <div id="player-error" class="player-error" role="alert" hidden></div>
         <div id="subtitle-switch"></div>
         <button id="btn-close-player">关闭播放器</button>
       </div>

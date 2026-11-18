@@ -31,6 +31,30 @@ main {
   padding: 16px 20px;
 }
 @media (max-width: 960px) { main { grid-template-columns: 1fr; } }
+#package-panel { grid-column: 1 / -1; }
+.btn-file {
+  display: inline-block;
+  border: 1px solid #17324f;
+  background: #17324f;
+  color: #fff;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.hint { font-size: 12px; color: #556; margin: 0 0 8px; }
+.package-status { font-size: 13px; margin-top: 8px; color: #334; }
+.package-status.error { color: #9c2717; }
+.package-report { font-size: 12px; margin-top: 6px; line-height: 1.7; word-break: break-word; }
+.package-report .code { font-family: ui-monospace, monospace; color: #9c2717; }
+.player-error {
+  font-size: 12px;
+  color: #9c2717;
+  background: #fbd9d3;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin: 6px 0;
+}
 section {
   background: #fff;
   border: 1px solid #dde1e7;

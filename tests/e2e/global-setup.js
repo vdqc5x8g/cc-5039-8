@@ -6,4 +6,10 @@ export default async function globalSetup() {
     console.log('[global-setup] origin-data missing, building media library…');
     execFileSync(process.execPath, ['tools/build-media.js'], { stdio: 'inherit' });
   }
+  // Sample packages are generated from origin-data; regenerate when absent.
+  const sample = 'packages/course-a-360p/package.json';
+  if (!fs.existsSync(sample)) {
+    console.log('[global-setup] sample packages missing, building…');
+    execFileSync(process.execPath, ['tools/build-samples.js'], { stdio: 'inherit' });
+  }
 }

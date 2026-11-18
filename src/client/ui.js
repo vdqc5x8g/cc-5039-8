@@ -1,4 +1,4 @@
-import { OfflineEngine } from './engine/engine.js';
+import { OfflineEngine, inspectPackageFiles } from './engine/engine.js';
 import { OfflinePlayer, installNetworkMonitor } from './engine/player.js';
 import { courseKey } from './engine/closure.js';
 
@@ -275,7 +275,99 @@ function updateProgress(courseId) {
   };
 }
 
+// ---------- offline package import ----------
+
+const packageState = {
+  files: null,
+  report: null,
+};
+
+function setPackageStatus(text, isError = false) {
+  const el = $('#package-status');
+  el.textContent = text;
+  el.className = `package-status${isError ? ' error' : ''}`;
+}
+
+function renderPackageReport(report) {
+  const el = $('#package-report');
+  if (!report) { el.innerHTML = ''; return; }
+  if (report.ok) {
+    const d = report.descriptor;
+    el.innerHTML =
+      `<span class="ok">校验通过</span> · ${d.courseId}（格式 v${d.formatVersion}，清单 v${d.manifest.version}）` +
+      ` · 组合 ${d.selection.quality} / 音频 ${d.selection.audio} / 字幕 ${d.selection.subs.join('+') || '无'}` +
+      ` · ${report.checkedObjects} 个对象摘要一致`;
+    el.className = 'package-report ok';
+    return;
+  }
+  el.innerHTML = [
+    `校验失败：${report.errors.length} 处`,
+    ...report.errors.map((e) => `<div><span class="code">${e.code}</span> ${e.message}</div>`),
+  ].join('');
+  el.className = 'package-report bad';
+}
+
+/** Zero-network contract check of the selected directory, before any import. */
+async function checkSelectedPackage() {
+  const files = packageState.files;
+  if (!files || files.length === 0) {
+    setPackageStatus('请先选择离线包目录', true);
+    return null;
+  }
+  const { report } = await inspectPackageFiles(files);
+  packageState.report = report;
+  renderPackageReport(report);
+  return report;
+}
+
+$('#package-input').addEventListener('change', async (event) => {
+  packageState.files = [...event.target.files];
+  packageState.report = null;
+  $('#btn-check-package').disabled = packageState.files.length === 0;
+  renderPackageReport(null);
+  if (packageState.files.length === 0) {
+    setPackageStatus('未选择文件');
+    return;
+  }
+  setPackageStatus(`已选择 ${packageState.files.length} 个文件，正在校验…`);
+  const report = await checkSelectedPackage();
+  setPackageStatus(report.ok ? '校验通过，正在导入…' : '校验失败，未导入', !report.ok);
+  if (!report.ok) return;
+  await importSelectedPackage();
+});
+
+$('#btn-check-package').addEventListener('click', async () => {
+  const report = await checkSelectedPackage();
+  setPackageStatus(report?.ok ? '校验通过' : '校验失败', !report?.ok);
+});
+
+async function importSelectedPackage() {
+  try {
+    const result = await engine.importPackage(packageState.files, {
+      onProgress: ({ objectsDone, objectsTotal }) => {
+        setPackageStatus(`导入中：${objectsDone}/${objectsTotal} 个对象`);
+      },
+    });
+    setPackageStatus(result.already ? '该离线包已在本地缓存中' : '离线包已导入，可断网播放');
+    await refresh();
+  } catch (err) {
+    setPackageStatus(`导入失败：${err.message}`, true);
+    if (err.errors) renderPackageReport({ ok: false, errors: err.errors });
+  }
+}
+
 // ---------- player ----------
+
+function showPlayerError(message) {
+  const el = $('#player-error');
+  if (!message) {
+    el.hidden = true;
+    el.textContent = '';
+    return;
+  }
+  el.hidden = false;
+  el.textContent = message;
+}
 
 async function playCourse(key) {
   const record = await engine.getRecord(key);
@@ -286,6 +378,7 @@ async function playCourse(key) {
   $('#player-active').hidden = false;
   const meta = $('#player-meta');
   meta.textContent = '正在从本地缓存装配…';
+  showPlayerError('');
 
   try {
     netMon.reset();
@@ -293,9 +386,13 @@ async function playCourse(key) {
     state.player = player;
     const sel = record.selection;
     const stats = await engine.stats();
+    const missing = await engine.playableInfo(key);
     meta.innerHTML =
       `课程：${record.title} · 组合：${sel.quality} / 音频 ${sel.audio} / 字幕 ${sel.subs.join('+') || '无'}<br>` +
       `可播放范围：0–${fmtSecs(record.closure.duration)} · 数据来源：本地缓存（对象 ${record.closure.objects.length} 个，库内共 ${stats.objectCount} 个）`;
+    if (!missing.complete) {
+      showPlayerError(`缺失资源：${missing.missing.map((o) => o.label).join('、')}`);
+    }
 
     const switcher = $('#subtitle-switch');
     switcher.innerHTML = '';
@@ -318,7 +415,12 @@ async function playCourse(key) {
     }, 300);
   } catch (err) {
     meta.textContent = `无法播放：${err.message}`;
+    showPlayerError(err.missing?.length ? `缺失资源：${err.missing.join('、')}` : err.message);
     $('#player-active').hidden = false;
+    // A failed open means the cache no longer matches the record. Re-render so
+    // the card stops advertising 可用 and disables playback instead of letting
+    // the same failure repeat.
+    await refresh();
   }
 }
 
@@ -329,6 +431,7 @@ async function closePlayer() {
   }
   if (state.playerTimer) clearInterval(state.playerTimer);
   state.playerTimer = null;
+  showPlayerError('');
   $('#player-active').hidden = true;
   $('#player-empty').hidden = false;
 }
